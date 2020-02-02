@@ -61,6 +61,8 @@ uint32_t oldestZeroScale = 0;           //time when scale was (first of series) 
 bool oldestZeroFlag = false;            //flag when oldest zero timer for scale is started
 long sonarDuration;                     //duration of sonar echo
 int sonarDistance;                      //distance of sonar in unknown units
+bool songOnFlag = false;                //flag is true when song is sweeping up or up
+uint32_t songOnTime = 0;                //time when song was on max volume
 
 
 
@@ -354,10 +356,27 @@ int getDistanceFromSonar(){
 }
 
 int incrementVolumFromSonar(int distance){
-  if (distance < 250 and volume < 100){                          // if person is in range --> bring volume up
-          volume = volume + 5;          
+  if (distance < 250 and songOnFlag == false){
+    songOnFlag = true;
+    songOnTime = millis();
   }
-  else if (volume > 0 and distance > 250) {volume = volume - 2;} // if person is out of range --> bring volume down
+  if (songOnFlag == true and millis()-songOnTime < 5000){
+    volume = volume + 5;
+    if (volume > 100){volume = 100;}
+  }
+  if (millis()-songOnTime > 5000 and distance > 250){
+    songOnFlag = false;
+    volume = volume - 3;
+    if (volume < 0){volume = 0;}
+  }
+  
+
+  
+  //if (distance < 250 and volume < 100){                          // if person is in range --> bring volume up
+  //        volume = volume + 5;          
+  //}
+  //else if (volume > 0 and distance > 250) {volume = volume - 2;} // if person is out of range --> bring volume down
+  //if (volume < 0){volume = 0;}
   return volume;
 }
 
