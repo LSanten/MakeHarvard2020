@@ -17,19 +17,26 @@
 //==========================================================================================================================================================================================================================================
 #include <Servo.h>                                //loading ServoMotors library
 #include <HX711.h>                                //library for 24-bit load cell communication
+#include <Adafruit_NeoPixel.h>
 
 
 //==========================================================================================================================================================================================================================================
 // Create and initialize global variables, objects, and constants (containers for all data)
 //==========================================================================================================================================================================================================================================
+#define LED_PIN    9                    //Adafruit LED Strip communication pin
+#define LED_COUNT 10
+
+
 HX711 scale(5, 6);                      //initialize scale usually (sck, dt) --> however on current board, prints are wrong, therefore swapped
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800); //initialize adafruit neopixel led object
+
 
 const int aliveLED = 13;                //create a name for "robot alive" blinky light pin 
 const int eStopPin = 12;                //create a name for pin connected to ESTOP switch
 boolean aliveLEDState = true;           //create a name for alive blinky light state to be used with timer
 boolean ESTOP = true;                   //create a name for emergency stop of all motors
 boolean realTimeRunStop = true;         //create a name for real time control loop flag
-boolean debug = false;                  //create a name for debug boolean - when true, OCU is active; when false, OCU is deactivated and will directly go into "main" mode
+boolean debug = true;                  //create a name for debug boolean - when true, OCU is active; when false, OCU is deactivated and will directly go into "main" mode
 String command = "move";                //create a String object name for operator command string
 String loopError = "no error";          //create a String for the real time control loop error system
 unsigned long oldLoopTime = 0;          //create a name for past loop time in milliseconds
@@ -41,8 +48,9 @@ float units;                            //units for 24-bit scale
 float ounces;                           //unit for scale
 int state = 1;                          //state of machine
 int subState = 0;                       //substate of machine
-int oldState = 0;
-int oldSubState =0;
+int oldState = 0;                       //old state
+int oldSubState =0;                     //old substate
+int LEDColorNumber = 0;                 //led color number - starts at 0
 
 
 //==========================================================================================================================================================================================================================================
@@ -61,6 +69,8 @@ void setup() {
     Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
     Serial.println(zero_factor);
     Serial.println(" Robot Controller Starting Up! Watch your little fingers! ");}
+  strip.begin();                         // begin adafruit neopixel LED strip
+  strip.show();                          // Initialize all pixels to 'off'
   
 
   // Step 2) Put your robot mission setup code here, to run once:
@@ -127,11 +137,8 @@ void loop() {
         realTimeRunStop = true;                                   // don't exit loop after running once
       }
       else if (command == "main") {
-        if (debug == true){
-          //Serial.println("Main robot ");
-          //Serial.println("Type stop to stop robot");
-        }
-        int subState = weightFromScale();
+        int subState = weightFromScale();                         // set subState to scale reading
+        setLEDStrip(units);                                       // call LED function with input from scale 
         realTimeRunStop = true;                                   // don't exit loop after running once
 
         if (state != oldState or subState != oldSubState){    
@@ -142,6 +149,7 @@ void loop() {
           oldState = state;
           oldSubState = subState;
         }
+        
       }
       else if (command == "scale") {
           scale.set_scale(calibration_factor); //Adjust to this calibration factor
@@ -154,7 +162,10 @@ void loop() {
           Serial.print(calibration_factor);
           Serial.println();                                // don't exit loop after running once
       }
-      
+      else if (command == "led") {
+          setLEDStrip(100.5);
+          Serial.println("LED Mode");
+      }
       else
       {
         Serial.println("**** WARNING **** Invalid Input, Robot Stopped, Please try again!");
@@ -229,6 +240,43 @@ void blinkAliveLED(){
     }
     // set the LED with the ledState of the variable:
     digitalWrite(aliveLED, aliveLEDState);
+}
+
+void setLEDStrip(float scaleInput) {
+  int input = scaleInput;                                   // convert float scale input to integer
+  if (LEDColorNumber == 0){
+    if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
+    int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
+    if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
+    uint32_t magenta = strip.Color(mapped_input,mapped_input,0);
+    strip.fill(magenta, 0, 10);
+  }
+  else if (LEDColorNumber == 1){
+    if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
+    int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
+    if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
+    uint32_t magenta = strip.Color(mapped_input,0,0);
+    strip.fill(magenta, 0, 10);
+  }
+  else if (LEDColorNumber == 2){
+    if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
+    int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
+    if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
+    uint32_t magenta = strip.Color(0,0,mapped_input);
+    strip.fill(magenta, 0, 10);
+  }
+  else if (LEDColorNumber == 3){
+    if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
+    int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
+    int mapped_input_2 = map(input, 0, 2500, 0, 100);
+    if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
+    uint32_t magenta = strip.Color(0,mapped_input_2,mapped_input);
+    strip.fill(magenta, 0, 10);
+  }
+
+  if (LEDColorNumber > 3){LEDColorNumber = 0;}
+  
+  strip.show();
 }
 
 // OCU functions ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu-----

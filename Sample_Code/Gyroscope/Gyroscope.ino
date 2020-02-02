@@ -1,18 +1,17 @@
 #include <Adafruit_L3GD20_U.h>
 
-Adafruit_L3GD20(void);
-Adafruit_L3GD20 gyro();
+Adafruit_L3GD20_Unified gyro();                   //gyro library I2C initialization
 
-// Define the pins for SPI
-#define GYRO_CS 4 // labeled CS
-#define GYRO_DO 3 // labeled SA0
-#define GYRO_DI A4  // labeled SDA
-#define GYRO_CLK A5 // labeled SCL
-
-Adafruit_L3GD20 gyro(GYRO_CS, GYRO_DO, GYRO_DI, GYRO_CLK);
 
 void setup() {
   // put your setup code here, to run once:
+  bool begin(gyroRange_t L3DS20_RANGE_250DPS);
+  // Try to initialise and warn if we couldn't detect the chip
+    if (!gyro.begin(gyro.L3DS20_RANGE_250DPS))
+  {
+    Serial.println("Oops ... unable to initialize the L3GD20. Check your wiring!");
+    while (1);
+  }
 
 
 
