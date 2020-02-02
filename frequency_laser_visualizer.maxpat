@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 34.0, 77.0, 1666.0, 969.0 ],
+		"rect" : [ 42.0, 85.0, 1666.0, 969.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -95,7 +95,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 22.0, 9.0, 266.0, 62.0 ],
-					"presentation_linecount" : 5,
 					"text" : "Music Laser Visualizer\n@author Leon Santen\n@project Frequency Laser Visualizer\n@date 2020-02-01"
 				}
 
@@ -121,7 +120,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "float" ],
 					"patching_rect" : [ 595.0, 544.0, 32.0, 22.0 ],
-					"text" : "/ 10."
+					"text" : "/ 12."
 				}
 
 			}
