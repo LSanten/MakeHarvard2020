@@ -38,7 +38,7 @@ const int echoPin = 10;                 //sonar echo pin
 boolean aliveLEDState = true;           //create a name for alive blinky light state to be used with timer
 boolean ESTOP = true;                   //create a name for emergency stop of all motors
 boolean realTimeRunStop = true;         //create a name for real time control loop flag
-boolean debug = false;                  //create a name for debug boolean - when true, OCU is active; when false, OCU is deactivated and will directly go into "main" mode
+boolean debug = false;                  //*****IMPORTANT***** ------  create a name for debug boolean - when true, OCU is active; when false, OCU is deactivated and will directly go into "main" mode
 String command = "move";                //create a String object name for operator command string
 String loopError = "no error";          //create a String for the real time control loop error system
 unsigned long oldLoopTime = 0;          //create a name for past loop time in milliseconds
@@ -226,8 +226,8 @@ void loop() {
       }
       else
       {
-        Serial.println("**** WARNING **** Invalid Input, Robot Stopped, Please try again!");
-        realTimeRunStop = false;
+        //Serial.println("**** WARNING **** Invalid Input, Robot Stopped, Please try again!");
+        realTimeRunStop = true;
       }
 
     // ACT act---act---act---act---act---act---act---act---act---act---act---act---act---act---act---act---act---act-----------
@@ -356,7 +356,7 @@ int getDistanceFromSonar(){
 }
 
 int incrementVolumFromSonar(int distance){
-  if (distance < 250 and songOnFlag == false){
+  if (distance < 100 and songOnFlag == false){
     songOnFlag = true;
     songOnTime = millis();
   }
@@ -364,19 +364,11 @@ int incrementVolumFromSonar(int distance){
     volume = volume + 5;
     if (volume > 100){volume = 100;}
   }
-  if (millis()-songOnTime > 5000 and distance > 250){
+  if (millis()-songOnTime > 5000 and distance > 100){
     songOnFlag = false;
     volume = volume - 3;
     if (volume < 0){volume = 0;}
   }
-  
-
-  
-  //if (distance < 250 and volume < 100){                          // if person is in range --> bring volume up
-  //        volume = volume + 5;          
-  //}
-  //else if (volume > 0 and distance > 250) {volume = volume - 2;} // if person is out of range --> bring volume down
-  //if (volume < 0){volume = 0;}
   return volume;
 }
 
