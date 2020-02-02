@@ -33,6 +33,8 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800); //initialize 
 
 const int aliveLED = 13;                //create a name for "robot alive" blinky light pin 
 const int eStopPin = 12;                //create a name for pin connected to ESTOP switch
+const int trigPin = 11;                 //sonar trigger pin
+const int echoPin = 10;                 //sonar echo pin
 boolean aliveLEDState = true;           //create a name for alive blinky light state to be used with timer
 boolean ESTOP = true;                   //create a name for emergency stop of all motors
 boolean realTimeRunStop = true;         //create a name for real time control loop flag
@@ -46,13 +48,20 @@ const long controlLoopInterval = 95;    //create a name for control loop cycle t
 float calibration_factor = -385;        //this calibration factor is adjusted according to my load cell // -385 MakerHawk Digital Load Cell Weight Sensor HX711
 float units;                            //units for 24-bit scale
 float ounces;                           //unit for scale
+//STATES STATES STATES STATES STATES 
 int state = 1;                          //state of machine
 int subState = 0;                       //substate of machine
 int oldState = 0;                       //old state
 int oldSubState =0;                     //old substate
+int volume = 0;                             //volume setting being sent to max
+int oldVolume = 0;                          //old volume setting being sent to max
+//STATES STATES STATES STATES STATES UP
 int LEDColorNumber = 0;                 //led color number - starts at 0
-uint32_t oldestZeroScale = 0;                //time when scale was (first of series) to measure for how long it was at 0 in order to turn off communication 
+uint32_t oldestZeroScale = 0;           //time when scale was (first of series) to measure for how long it was at 0 in order to turn off communication 
 bool oldestZeroFlag = false;            //flag when oldest zero timer for scale is started
+long sonarDuration;                     //duration of sonar echo
+int sonarDistance;                      //distance of sonar in unknown units
+
 
 
 //==========================================================================================================================================================================================================================================
@@ -61,21 +70,36 @@ bool oldestZeroFlag = false;            //flag when oldest zero timer for scale 
 //==========================================================================================================================================================================================================================================
 void setup() {
   // Step 1) Put your robot setup code here, to run once:
-  pinMode(aliveLED, OUTPUT);            //initialize aliveLED pin as an output
-  pinMode(eStopPin, INPUT_PULLUP);      //use internal pull-up on ESTOP switch input pin 
-  Serial.begin(9600);                   //start serial communication
-  scale.set_scale();                    //set scale object
-  scale.tare();                         //Reset the scale to 0 
-  long zero_factor = scale.read_average(); //Get a baseline reading
+  pinMode(aliveLED, OUTPUT);                      //initialize aliveLED pin as an output
+  pinMode(eStopPin, INPUT_PULLUP);                //use internal pull-up on ESTOP switch input pin 
+  pinMode(trigPin, OUTPUT);                       // Sets the trigPin as an Output
+  pinMode(echoPin, INPUT);                        // Sets the echoPin as an Input
+  Serial.begin(9600);                             //start serial communication
+  scale.set_scale();                              //set scale object
+  scale.tare();                                   //Reset the scale to 0 
+  long zero_factor = scale.read_average();        //Get a baseline reading
   if (debug == true){
-    Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
+    Serial.print("Zero factor: ");                //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
     Serial.println(zero_factor);
     Serial.println(" Robot Controller Starting Up! Watch your little fingers! ");}
-  strip.begin();                         // begin adafruit neopixel LED strip
-  strip.show();                          // Initialize all pixels to 'off'
+  strip.begin();                                  // begin adafruit neopixel LED strip
+  strip.show();                                   // Initialize all pixels to 'off'
   
 
   // Step 2) Put your robot mission setup code here, to run once:
+  uint32_t green = strip.Color(0,255,0);
+  uint32_t off = strip.Color(0,0,0);
+  strip.fill(green, 0, 10);
+  strip.show();
+  delay(700);
+  strip.fill(off, 0, 10);
+  strip.show();
+  delay(700);
+  strip.fill(green, 0, 10);
+  strip.show();
+  delay(700);
+  strip.fill(off, 0, 10);
+  strip.show();
 }
 //==========================================================================================================================================================================================================================================
 // Flight code to run continuously until robot is powered down
@@ -150,14 +174,21 @@ void loop() {
         }
         
         if (units > 0 and oldestZeroFlag == true){oldestZeroFlag = false;}                //deactivate flag when values higher than 0
+
+        int distance = getDistanceFromSonar();                         // call sonar function
+        incrementVolumFromSonar(distance);                             // increment volume when person in range, slide volume down when far away
         
-        if (millis() - oldestZeroScale < 1000 or state != oldState or subState != oldSubState){
+        if (millis() - oldestZeroScale < 1000 or state != oldState or subState != oldSubState or volume != oldVolume){ // only print states and volume when changed --> will keep sending zeros from scale for one more second to smoothen out signal in MAX
+          
           Serial.print(state);
           Serial.print(" ");
-          Serial.println(subState);
+          Serial.print(subState);
+          Serial.print(" ");
+          Serial.println(volume);
 
           oldState = state;
           oldSubState = subState;
+          oldVolume = volume;
         }
         
         
@@ -177,6 +208,19 @@ void loop() {
       else if (command == "led") {
           setLEDStrip(100.5);
           Serial.println("LED Mode");
+      }
+      else if (command == "sonar") {
+          int distance = getDistanceFromSonar();          // call sonar function
+          Serial.print("sonarDistance: ");                // Prints the sonarDistance on the Serial Monitor
+          Serial.println(distance);
+          setLEDStrip(distance);
+      }
+      else if (command == "sonar-main") {                              // volume settings change if someone is in front of sensor
+        int distance = getDistanceFromSonar();                         // call sonar function
+        incrementVolumFromSonar(distance);                             // increment volume when person in range, slide volume down when far away
+        Serial.println(volume);
+        // function for volume incrementation
+
       }
       else
       {
@@ -297,6 +341,24 @@ void setLEDStrip(float scaleInput) {
   if (LEDColorNumber > 4){LEDColorNumber = 0;}
   
   strip.show();
+}
+int getDistanceFromSonar(){
+  digitalWrite(trigPin, LOW);                     // Clears the trigPin
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);                    // Sets the trigPin on HIGH state for 10 micro seconds
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  sonarDuration = pulseIn(echoPin, HIGH);         // Reads the echoPin, returns the sound wave travel time in microseconds
+  sonarDistance= sonarDuration*0.034/2;           // Calculating the sonarDistance
+  return sonarDistance;   
+}
+
+int incrementVolumFromSonar(int distance){
+  if (distance < 250 and volume < 100){                          // if person is in range --> bring volume up
+          volume = volume + 5;          
+  }
+  else if (volume > 0 and distance > 250) {volume = volume - 2;} // if person is out of range --> bring volume down
+  return volume;
 }
 
 // OCU functions ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu---ocu-----
