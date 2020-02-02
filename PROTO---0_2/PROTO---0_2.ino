@@ -4,7 +4,7 @@
  * Title: Make Harvard 2020 Project
  * Description: 
  * Robot Name: MusicMachine
- * What does code do?: Weight from scale changes frequency in MAX/MSP + attemptive gyroscope integration
+ * What does code do?: Weight from scale changes frequency in MAX/MSP + LED Strip integration
  * Hardware wanings:
  * Created by Leon Santen (leon.santen@icloud.com ), January 2020
  *******************************************************************************************************************************************************************************************************************************************
@@ -17,7 +17,7 @@
 //==========================================================================================================================================================================================================================================
 #include <Servo.h>                                //loading ServoMotors library
 #include <HX711.h>                                //library for 24-bit load cell communication
-#include <Adafruit_NeoPixel.h>
+#include <Adafruit_NeoPixel.h>                    //library for Adafruit Neopixel LED Strip (GRB)
 
 
 //==========================================================================================================================================================================================================================================
@@ -36,7 +36,7 @@ const int eStopPin = 12;                //create a name for pin connected to EST
 boolean aliveLEDState = true;           //create a name for alive blinky light state to be used with timer
 boolean ESTOP = true;                   //create a name for emergency stop of all motors
 boolean realTimeRunStop = true;         //create a name for real time control loop flag
-boolean debug = true;                  //create a name for debug boolean - when true, OCU is active; when false, OCU is deactivated and will directly go into "main" mode
+boolean debug = false;                  //create a name for debug boolean - when true, OCU is active; when false, OCU is deactivated and will directly go into "main" mode
 String command = "move";                //create a String object name for operator command string
 String loopError = "no error";          //create a String for the real time control loop error system
 unsigned long oldLoopTime = 0;          //create a name for past loop time in milliseconds
@@ -51,6 +51,8 @@ int subState = 0;                       //substate of machine
 int oldState = 0;                       //old state
 int oldSubState =0;                     //old substate
 int LEDColorNumber = 0;                 //led color number - starts at 0
+uint32_t oldestZeroScale = 0;                //time when scale was (first of series) to measure for how long it was at 0 in order to turn off communication 
+bool oldestZeroFlag = false;            //flag when oldest zero timer for scale is started
 
 
 //==========================================================================================================================================================================================================================================
@@ -141,7 +143,15 @@ void loop() {
         setLEDStrip(units);                                       // call LED function with input from scale 
         realTimeRunStop = true;                                   // don't exit loop after running once
 
-        if (state != oldState or subState != oldSubState){    
+        //if (state != oldState or subState != oldSubState){ 
+        if (units == 0 and oldestZeroFlag == false){                                      // if scale units values start to be 0, start flag and get time
+          oldestZeroFlag = true;
+          oldestZeroScale = millis();
+        }
+        
+        if (units > 0 and oldestZeroFlag == true){oldestZeroFlag = false;}                //deactivate flag when values higher than 0
+        
+        if (millis() - oldestZeroScale < 1000 or state != oldState or subState != oldSubState){
           Serial.print(state);
           Serial.print(" ");
           Serial.println(subState);
@@ -149,6 +159,8 @@ void loop() {
           oldState = state;
           oldSubState = subState;
         }
+        
+        
         
       }
       else if (command == "scale") {
@@ -244,7 +256,7 @@ void blinkAliveLED(){
 
 void setLEDStrip(float scaleInput) {
   int input = scaleInput;                                   // convert float scale input to integer
-  if (LEDColorNumber == 0){
+  if (LEDColorNumber == 0){                                    // sweep through different colors for led strip
     if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
     int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
     if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
@@ -268,13 +280,21 @@ void setLEDStrip(float scaleInput) {
   else if (LEDColorNumber == 3){
     if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
     int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
-    int mapped_input_2 = map(input, 0, 2500, 0, 100);
+    int mapped_input_2 = map(input, 0, 2500, 0, 200);
     if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
     uint32_t magenta = strip.Color(0,mapped_input_2,mapped_input);
     strip.fill(magenta, 0, 10);
   }
+  else if (LEDColorNumber == 4){
+    if (scaleInput == 0){LEDColorNumber ++;}                   // increment LED color when not touched    
+    int mapped_input = map(input, 0, 2500, 0, 255);            // map scale Input to LED brightness
+    int mapped_input_2 = map(input, 0, 2500, 0, 200);
+    if (mapped_input > 255){mapped_input = 255;}               // set max value for LEDs to 255
+    uint32_t magenta = strip.Color(mapped_input_2,mapped_input_2,mapped_input);
+    strip.fill(magenta, 0, 10);
+  }
 
-  if (LEDColorNumber > 3){LEDColorNumber = 0;}
+  if (LEDColorNumber > 4){LEDColorNumber = 0;}
   
   strip.show();
 }
